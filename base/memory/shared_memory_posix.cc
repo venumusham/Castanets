@@ -105,11 +105,11 @@ bool SharedMemory::Create(const SharedMemoryCreateOptions& options, int sid) {
   ScopedFD readonly_fd;
 
   FilePath path;
-#if defined(NETWORK_SHARED_MEMORY)
+#if defined(NETWORK_SHARED_MEMORY) || defined(LOCAL_SHARED_MEMORY)
   int shared_memory_file_id = sid;
 #endif
   if (options.name_deprecated == NULL || options.name_deprecated->empty()) {
-#if defined(NETWORK_SHARED_MEMORY)
+#if defined(NETWORK_SHARED_MEMORY) || defined(LOCAL_SHARED_MEMORY)
     bool result =
         CreateAnonymousSharedMemory(options, &fp, &readonly_fd, &path, &shared_memory_file_id);
 #else
@@ -125,7 +125,7 @@ bool SharedMemory::Create(const SharedMemoryCreateOptions& options, int sid) {
 
     // Make sure that the file is opened without any permission
     // to other users on the system.
-#if defined(NETWORK_SHARED_MEMORY)
+#if defined(NETWORK_SHARED_MEMORY) && !defined(LOCAL_SHARED_MEMORY)
     const mode_t kOwnerOnly = S_IRUSR | S_IWUSR | S_IRWXU| S_IRWXO;
 #else
     const mode_t kOwnerOnly = S_IRUSR | S_IWUSR;
@@ -153,7 +153,7 @@ bool SharedMemory::Create(const SharedMemoryCreateOptions& options, int sid) {
       // Check that the current user owns the file.
       // If uid != euid, then a more complex permission model is used and this
       // API is not appropriate.
-#if !defined(NETWORK_SHARED_MEMORY)
+#if !defined(NETWORK_SHARED_MEMORY) && !defined(LOCAL_SHARED_MEMORY)
       const uid_t real_uid = getuid();
       const uid_t effective_uid = geteuid();
       struct stat sb;
@@ -215,7 +215,7 @@ bool SharedMemory::Create(const SharedMemoryCreateOptions& options, int sid) {
   int readonly_mapped_file = -1;
   bool result = PrepareMapFile(std::move(fp), std::move(readonly_fd),
                                &mapped_file, &readonly_mapped_file);
-#if !defined(NETWORK_SHARED_MEMORY)
+#if !defined(NETWORK_SHARED_MEMORY) && !defined(LOCAL_SHARED_MEMORY)
   shm_ = SharedMemoryHandle(base::FileDescriptor(mapped_file, false),
                             options.size, UnguessableToken::Create());
   readonly_shm_ =
@@ -399,7 +399,7 @@ bool SharedMemory::FilePathForMemoryName(const std::string& mem_name,
 
 #if defined(GOOGLE_CHROME_BUILD)
   std::string name_base = std::string("com.google.Chrome");
-#elif defined(NETWORK_SHARED_MEMORY)
+#elif defined(NETWORK_SHARED_MEMORY) || defined(LOCAL_SHARED_MEMORY)
   std::string name_base = std::string(".org.chromium.Chromium");
 #else
   std::string name_base = std::string("org.chromium.Chromium");
